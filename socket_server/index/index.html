@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Socket.io chat</title>
+        <link rel="stylesheet" href="style.css">
+    </head>
+    <body>
+        <ul id="messages">many message...</ul>
+        <form id="send_form" action="">
+            <input id="input">
+            <button id="send_button">Send</button>
+        </form>
+    </body>
+    <!--load the client side of socket.io-->
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let message_box = document.getElementById('messages');
+        let button = document.getElementById('send_button');
+        let form = document.getElementById('send_form');
+        let input = document.getElementById('input');
+        
+        let post_msg = (msg) => {
+            // sender
+            let div = document.createElement('div');
+            // remove "" bracket
+            let name = JSON.stringify(msg.sender.name);
+            name = name.substring(1,name.length-1);
+            div.textContent = name;
+            div.style.fontFamily = 'sans-serif';
+            message_box.appendChild(div);
+
+            // text
+            let li = document.createElement('li');
+            li.textContent = msg.text;
+            li.style.width = msg.text.length + '%';
+            message_box.appendChild(li);
+            // let window scroll to (0, window_scrollHeight) when overflow
+            message_box.scrollTo(0, message_box.offsetHeight); 
+        };
+
+        // when this user send message
+        form.addEventListener('submit', (event) => {
+            // dont do default event, use customized one
+            event.preventDefault(); 
+            if(input.value){
+                let msg = {text:input.value, sender:user};
+                post_msg(msg);
+                socket.emit('chat_message', msg);
+                input.value = '';
+            }
+        })
+        // timeout function
+        let typing = false;
+        const TYPE_TIMEOUT = 3000;
+        let timeout = () => {
+            typing = false;
+            socket.emit('not_typing', user);
+        };
+        // is-typing event
+        form.addEventListener('keydown', (event) => {
+            if(event.key != 'Enter'){
+                if(!typing){
+                    typing = true;
+                    socket.emit('is_typing', user);
+                    setTimeout(timeout, TYPE_TIMEOUT);
+                }
+            }
+        });
+        // from server response
+        socket.on('is_typing', (user) => {
+            let p = document.createElement('p');
+            let name = JSON.stringify(user.name);
+            name = name.substring(1,name.length-1);
+            p.textContent = `${name} is typing ... `;
+            p.setAttribute('id',name + '_typing');
+            p.classList.add('typing');
+            p.style.width = (p.textContent.length)*0.95 + '%';
+            message_box.appendChild(p);
+        })
+
+        socket.on('not_typing', (user) => {
+            let name = JSON.stringify(user.name);
+            name = name.substring(1,name.length-1);
+            let p = document.getElementById(name + '_typing');
+            message_box.removeChild(p);
+        })
+
+        // ask for user name
+        let name = window.prompt("Welcome to socket.io!\n Please enter your name: ");
+        let user = {name:name};
+        socket.emit('user_info', user);
+
+        // received broadcase message
+        socket.on('chat_message', post_msg);
+
+        // when someone connected
+        socket.on('connected', (user) => {
+            let p = document.createElement('p');
+            p.textContent = `${user.name} connected!`;
+            message_box.append(p);
+        })
+
+        // when someone connected
+        socket.on('disconnected', () => {
+            let p = document.createElement('p');
+            p.textContent = `A user disconnected!`;
+            message_box.append(p);
+        })
+    
+    </script>
+</html>
